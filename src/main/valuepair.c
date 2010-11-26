@@ -80,7 +80,8 @@ int radius_compare_vps(REQUEST *request, VALUE_PAIR *check, VALUE_PAIR *vp)
 		/*
 		 *	Include substring matches.
 		 */
-		compare = regcomp(&reg, check->vp_strvalue, REG_EXTENDED);
+		compare = regcomp(&reg, check->vp_strvalue, REG_EXTENDED |
+				  (check->flags.ignore_case ? REG_ICASE : 0));
 		if (compare != 0) {
 			char buffer[256];
 			regerror(compare, &reg, buffer, sizeof(buffer));
@@ -158,7 +159,8 @@ int radius_compare_vps(REQUEST *request, VALUE_PAIR *check, VALUE_PAIR *vp)
 		 *	Include substring matches.
 		 */
 		compare = regcomp(&reg, (char *)check->vp_strvalue,
-				  REG_EXTENDED);
+				  REG_EXTENDED |
+				  (check->flags.ignore_case ? REG_ICASE : 0));
 		if (compare != 0) {
 			char buffer[256];
 			regerror(compare, &reg, buffer, sizeof(buffer));

@@ -79,6 +79,9 @@ int		getword (const char **ptr, char *buf, int buflen);
 int		getbareword (const char **ptr, char *buf, int buflen);
 FR_TOKEN	gettoken(const char **ptr, char *buf, int buflen);
 FR_TOKEN	getstring(const char **ptr, char *buf, int buflen);
+#ifdef HAVE_REGEX_H
+FR_TOKEN	getregex(const char **ptr, char *buf, size_t buflen, int *pcflags);
+#endif
 
 #ifdef __cplusplus
 }

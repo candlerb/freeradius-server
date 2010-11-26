@@ -29,6 +29,27 @@ RCSID("$Id$")
 
 #include <ctype.h>
 
+#ifdef HAVE_REGEX_H
+#include <regex.h>
+
+/*
+ *  For POSIX Regular expressions.
+ *  (0) Means no extended regular expressions.
+ *  REG_EXTENDED means use extended regular expressions.
+ */
+#ifndef REG_EXTENDED
+#define REG_EXTENDED (0)
+#endif
+
+#ifndef REG_NOSUB
+#define REG_NOSUB (0)
+#endif
+
+#ifndef REG_ICASE
+#define REG_ICASE (0)
+#endif
+#endif
+
 static const FR_NAME_NUMBER tokens[] = {
 	{ "=~", T_OP_REG_EQ,	}, /* order is important! */
 	{ "!~", T_OP_REG_NE,	},
@@ -283,3 +304,84 @@ const char *fr_int2str(const FR_NAME_NUMBER *table, int number,
 
 	return def;
 }
+
+#ifdef HAVE_REGEX_H
+FR_TOKEN getregex(const char **ptr, char *buffer, size_t buflen,
+			 int *pcflags)
+{
+	const char *p = *ptr;
+	char *q = buffer;
+
+	if (*p != '/') return T_OP_INVALID;
+
+	*pcflags = REG_EXTENDED;
+
+	p++;
+	while (*p) {
+		if (buflen <= 1) break;
+
+		if (*p == '/') {
+			p++;
+
+			/*
+			 *	Check for case insensitivity
+			 */
+			if (*p == 'i') {
+				p++;
+				*pcflags |= REG_ICASE;
+			}
+
+			break;
+		}
+
+		if (*p == '\\') {
+			int x;
+			
+			switch (p[1]) {
+			case 'r':
+				*q++ = '\r';
+				break;
+			case 'n':
+				*q++ = '\n';
+				break;
+			case 't':
+				*q++ = '\t';
+				break;
+			case '"':
+				*q++ = '"';
+				break;
+			case '\'':
+				*q++ = '\'';
+				break;
+			case '`':
+				*q++ = '`';
+				break;
+				
+				/*
+				 *	FIXME: add 'x' and 'u'
+				 */
+
+			default:
+				if ((p[1] >= '0') && (p[1] <= '9') &&
+				    (sscanf(p + 1, "%3o", &x) == 1)) {
+					*q++ = x;
+					p += 2;
+				} else {
+					*q++ = p[1];
+				}
+				break;
+			}
+			p += 2;
+			buflen--;
+			continue;
+		}
+
+		*(q++) = *(p++);
+		buflen--;
+	}
+	*q = '\0';
+	*ptr = p;
+
+	return T_DOUBLE_QUOTED_STRING;
+}
+#endif

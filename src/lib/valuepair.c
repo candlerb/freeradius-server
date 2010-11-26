@@ -33,6 +33,14 @@ RCSID("$Id$")
 
 #ifdef HAVE_REGEX_H
 #  include	<regex.h>
+
+#ifndef REG_EXTENDED
+#define REG_EXTENDED (0)
+#endif
+
+#ifndef REG_ICASE
+#define REG_ICASE (0)
+#endif
 #endif
 
 static const char *months[] = {
@@ -1638,6 +1646,7 @@ VALUE_PAIR *pairread(const char **ptr, FR_TOKEN *eol)
 	FR_TOKEN	token, t, xlat;
 	VALUE_PAIR	*vp;
 	size_t		len;
+	int		cflags = 0;
 
 	*eol = T_OP_INVALID;
 
@@ -1690,6 +1699,14 @@ VALUE_PAIR *pairread(const char **ptr, FR_TOKEN *eol)
 	}
 
 	/* Read value.  Note that empty string values are allowed */
+#ifdef HAVE_REGEX_H
+	p = *ptr;
+	while (*p && (isspace((int) *p))) p++;
+	*ptr = p;
+	if (*p == '/')
+		xlat = getregex(ptr, value, sizeof(value), &cflags);
+	else
+#endif
 	xlat = gettoken(ptr, value, sizeof(value));
 	if (xlat == T_EOL) {
 		fr_strerror_printf("failed to get value");
@@ -1750,6 +1767,7 @@ VALUE_PAIR *pairread(const char **ptr, FR_TOKEN *eol)
 				return NULL;
 			}
 		}
+		if (cflags & REG_ICASE) vp->flags.ignore_case = 1;
 		break;
 
 	case T_SINGLE_QUOTED_STRING:
@@ -1947,7 +1965,8 @@ int paircmp(VALUE_PAIR *one, VALUE_PAIR *two)
 			char buffer[MAX_STRING_LEN * 4 + 1];
 
 			compare = regcomp(&reg, one->vp_strvalue,
-					  REG_EXTENDED);
+					  REG_EXTENDED |
+					  (one->flags.ignore_case ? REG_ICASE : 0));
 			if (compare != 0) {
 				regerror(compare, &reg, buffer, sizeof(buffer));
 				fr_strerror_printf("Illegal regular expression in attribute: %s: %s",

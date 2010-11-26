@@ -220,6 +220,13 @@ int vp_prints_value(char * out, size_t outlen, VALUE_PAIR *vp, int delimitst)
 				fr_print_string(vp->vp_strvalue,
 						 vp->length, buf + 1, sizeof(buf) - 2);
 				strcat(buf, "\"");
+                        } else if (delimitst == 1 && vp->flags.ignore_case) {
+				/* case-insensitive regexp */
+                        	buf[0] = '/';
+				fr_print_string(vp->vp_strvalue,
+						 vp->length, buf + 1, sizeof(buf) - 3);
+				strcat(buf, "/i");
+
 			} else if (delimitst == 1) {
 				/* Non-tagged attribute: print delimter */
 				buf[0] = '"';
