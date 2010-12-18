@@ -33,6 +33,7 @@ RCSID("$Id$")
 
 #ifdef HAVE_REGEX_H
 #  include	<regex.h>
+static int iregcomp(regex_t *preg, const char *regex, int cflags);
 #endif
 
 static const char *months[] = {
@@ -516,7 +517,7 @@ void pairmove(VALUE_PAIR **to, VALUE_PAIR **from)
 			    *(q++) = '\0';
 			    q[strlen(q) - 1] = '\0';
 
-			    regcomp(&reg, str, 0);
+			    iregcomp(&reg, str, 0);
 			    if (regexec(&reg, found->vp_strvalue,
 					1, match, 0) == 0) {
 			      fprintf(stderr, "\"%s\" will have %d to %d replaced with %s\n",
@@ -1946,7 +1947,7 @@ int paircmp(VALUE_PAIR *one, VALUE_PAIR *two)
 			regex_t reg;
 			char buffer[MAX_STRING_LEN * 4 + 1];
 
-			compare = regcomp(&reg, one->vp_strvalue,
+			compare = iregcomp(&reg, one->vp_strvalue,
 					  REG_EXTENDED);
 			if (compare != 0) {
 				regerror(compare, &reg, buffer, sizeof(buffer));
@@ -2067,3 +2068,19 @@ int paircmp(VALUE_PAIR *one, VALUE_PAIR *two)
 
 	return 0;
 }
+
+#ifdef HAVE_REGEX_H
+static int iregcomp(regex_t *preg, const char *regex, int cflags)
+{
+	char buf[1024];
+	size_t len;
+	if (!strncmp(regex, "(?i:", 4)
+	    && (len = strlen(regex)) < sizeof(buf)
+	    && regex[len-1] == ')') {
+		strcpy(buf, regex+4);
+		buf[len-5] = '\0';
+		return regcomp(preg, buf, cflags | REG_ICASE);
+	}
+	return regcomp(preg, regex, cflags);
+}
+#endif

@@ -30,6 +30,7 @@ RCSID("$Id$")
 
 #ifdef HAVE_REGEX_H
 #	include <regex.h>
+static int iregcomp(regex_t *preg, const char *regex, int cflags);
 
 /*
  *  For POSIX Regular expressions.
@@ -80,7 +81,7 @@ int radius_compare_vps(REQUEST *request, VALUE_PAIR *check, VALUE_PAIR *vp)
 		/*
 		 *	Include substring matches.
 		 */
-		compare = regcomp(&reg, check->vp_strvalue, REG_EXTENDED);
+		compare = iregcomp(&reg, check->vp_strvalue, REG_EXTENDED);
 		if (compare != 0) {
 			char buffer[256];
 			regerror(compare, &reg, buffer, sizeof(buffer));
@@ -157,7 +158,7 @@ int radius_compare_vps(REQUEST *request, VALUE_PAIR *check, VALUE_PAIR *vp)
 		/*
 		 *	Include substring matches.
 		 */
-		compare = regcomp(&reg, (char *)check->vp_strvalue,
+		compare = iregcomp(&reg, (char *)check->vp_strvalue,
 				  REG_EXTENDED);
 		if (compare != 0) {
 			char buffer[256];
@@ -755,3 +756,19 @@ void debug_pair_list(VALUE_PAIR *vp)
 	}
 	fflush(fr_log_fp);
 }
+
+#ifdef HAVE_REGEX_H
+static int iregcomp(regex_t *preg, const char *regex, int cflags)
+{
+	char buf[1024];
+	size_t len;
+	if (!strncmp(regex, "(?i:", 4)
+	    && (len = strlen(regex)) < sizeof(buf)
+	    && regex[len-1] == ')') {
+		strcpy(buf, regex+4);
+		buf[len-5] = '\0';
+		return regcomp(preg, buf, cflags | REG_ICASE);
+	}
+	return regcomp(preg, regex, cflags);
+}
+#endif
