@@ -437,6 +437,33 @@ static size_t xlat_integer(void *instance, REQUEST *request,
 	return snprintf(out, outlen, "%u", vp->vp_integer);
 }
 
+static size_t xlat_str(void *instance, REQUEST *request,
+		       char *fmt, char *out, size_t outlen,
+		       RADIUS_ESCAPE_STRING func)
+{
+	VALUE_PAIR *vp;
+
+	while (isspace((int) *fmt)) fmt++;
+
+	if (!radius_get_vp(request, fmt, &vp) || !vp) {
+		*out = '\0';
+		return 0;
+	}
+
+	if ((vp->type != PW_TYPE_STRING) &&
+	    (vp->type != PW_TYPE_OCTETS)) {
+		*out = '\0';
+		return 0;
+	}
+
+	rad_assert(outlen > 0);
+	outlen--;  /* ensure space for trailing '\0' */
+	if (outlen > vp->length) outlen = vp->length;
+	memcpy(out, vp->vp_strvalue, outlen);
+	out[outlen] = '\0';
+	return outlen;
+}
+
 #ifdef HAVE_REGEX_H
 /*
  *	Pull %{0} to %{8} out of the packet.
@@ -674,6 +701,11 @@ int xlat_register(const char *module, RAD_XLAT_FUNC func, void *instance)
 
 		xlat_register("integer", xlat_integer, "");
 		c = xlat_find("integer");
+		rad_assert(c != NULL);
+		c->internal = TRUE;
+
+		xlat_register("string", xlat_str, "");
+		c = xlat_find("string");
 		rad_assert(c != NULL);
 		c->internal = TRUE;
 
