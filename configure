@@ -1476,7 +1476,7 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-system-libtldl   Use the libltdl installed in your system (default=use our own)
+  --with-system-libltdl   Use the libltdl installed in your system (default=use our own)
   --with-system-libtool   Use the libtool installed in your system (default=use our own)
   --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
   --with-pic              try to use only PIC/non-PIC objects [default=use
@@ -4788,15 +4788,16 @@ echo "$as_me: error: GNU Make is not installed.  Please download and install it
 fi
 
 
-# Check whether --with-system-libtldl was given.
-if test "${with_system_libtldl+set}" = set; then
-  withval=$with_system_libtldl;
+# Check whether --with-system-libltdl was given.
+if test "${with_system_libltdl+set}" = set; then
+  withval=$with_system_libltdl;
 LIBLTDL="-lltdl"
 INCLTDL=
 LTDL_SUBDIRS=
 
 else
 
+test x"$enable_ltdl_install" = x && enable_ltdl_install=yes
   { echo "$as_me:$LINENO: checking for lt_dlinit in -lltdl" >&5
 echo $ECHO_N "checking for lt_dlinit in -lltdl... $ECHO_C" >&6; }
 if test "${ac_cv_lib_ltdl_lt_dlinit+set}" = set; then
@@ -25120,7 +25121,7 @@ echo "${ECHO_T}$ac_cv_func_lt_dladvise_init" >&6; }
 if test $ac_cv_func_lt_dladvise_init = yes; then
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_HAVE_LT_DLADVISE_INIT
+#define HAVE_LT_DLADVISE_INIT
 _ACEOF
 
 fi
