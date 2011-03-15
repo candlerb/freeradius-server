@@ -1474,7 +1474,7 @@ static modcallable *do_compile_modswitch(modcallable *parent,
 	}
 
 	csingle= do_compile_modgroup(parent, component, cs,
-				     GROUPTYPE_SIMPLE, GROUPTYPE_SIMPLE);
+				     GROUPTYPE_SIMPLE, -1);
 	if (!csingle) return NULL;
 	csingle->type = MOD_SWITCH;
 	return csingle;
@@ -1689,7 +1689,7 @@ static modcallable *do_compile_modsingle(modcallable *parent,
 			*modname = name2;
 			csingle= do_compile_modgroup(parent, component, cs,
 						     GROUPTYPE_SIMPLE,
-						     grouptype);
+						     -1);
 			if (!csingle) return NULL;
 			csingle->type = MOD_IF;
 
@@ -1718,7 +1718,7 @@ static modcallable *do_compile_modsingle(modcallable *parent,
 			*modname = name2;
 			csingle= do_compile_modgroup(parent, component, cs,
 						     GROUPTYPE_SIMPLE,
-						     grouptype);
+						     -1);
 			if (!csingle) return NULL;
 			csingle->type = MOD_ELSIF;
 
@@ -1747,7 +1747,7 @@ static modcallable *do_compile_modsingle(modcallable *parent,
 			*modname = name2;
 			csingle= do_compile_modgroup(parent, component, cs,
 						     GROUPTYPE_SIMPLE,
-						     grouptype);
+						     -1);
 			if (!csingle) return NULL;
 			csingle->type = MOD_ELSE;
 			return csingle;
@@ -1785,7 +1785,7 @@ static modcallable *do_compile_modsingle(modcallable *parent,
 
 			csingle= do_compile_modgroup(parent, component, cs,
 						     GROUPTYPE_SIMPLE,
-						     grouptype);
+						     -1);
 			if (!csingle) return NULL;
 			csingle->type = MOD_CASE;
 			csingle->name = cf_section_name2(cs); /* may be NULL */
@@ -2123,15 +2123,16 @@ static modcallable *do_compile_modgroup(modcallable *parent,
 	 *	Set the default actions, if they haven't already been
 	 *	set.
 	 */
-	for (i = 0; i < RLM_MODULE_NUMCODES; i++) {
-		if (!c->actions[i]) {
-			if (!parent || (component != RLM_COMPONENT_AUTH)) {
-				c->actions[i] = defaultactions[component][parentgrouptype][i];
-			} else { /* inside Auth-Type has different rules */
-				c->actions[i] = defaultactions[RLM_COMPONENT_AUTZ][parentgrouptype][i];
-			}
-		}
-	}
+	if (parentgrouptype >= 0)
+                for (i = 0; i < RLM_MODULE_NUMCODES; i++) {
+                        if (!c->actions[i]) {
+                                if (!parent || (component != RLM_COMPONENT_AUTH)) {
+                                        c->actions[i] = defaultactions[component][parentgrouptype][i];
+                                } else { /* inside Auth-Type has different rules */
+                                        c->actions[i] = defaultactions[RLM_COMPONENT_AUTZ][parentgrouptype][i];
+                                }
+                        }
+                }
 
 	/*
 	 *	FIXME: If there are no children, return NULL?
