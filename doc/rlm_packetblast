@@ -1,0 +1,88 @@
+0. INTRODUCTION
+
+The rlm_packetblast module provides a way to send a copy of accounting
+packets to another host or hosts, whilst continuing the normal processing
+flow.
+
+It sends in a fire-and-forget manner. It does not wait for any
+Accounting-Response acknowledgement, and it does not queue or resend.  This
+is ideal if you want a test feed of accounting data from a live service, say
+to inject real accounting data into a lab environment, and it has a very low
+overhead.
+
+You can send copies of accounting packets to multiple destinations, and you
+may invoke the module multiple times.
+
+Note: if you want to duplicate accounting data reliably for billing purposes
+etc, then you should instead look at:
+
+   raddb/sites-available/robust-proxy-accounting
+   raddb/sites-available/copy-acct-to-home-server 
+   raddb/sites-available/decoupled-accounting 
+
+(which basically means writing accounting packets into one or more detail
+files, and then using freeradius to consume these files and resend the
+packets reliably)
+
+1. CONFIGURATION
+
+Configuration is very simple:
+
+host::
+    The hostname or IP address to send to (required). To send to multiple
+    destinations this should be a comma-separated list of ip[:port] values
+port::
+    The port to send to (default: 1813)
+secret::
+    The shared secret to sign the packet with (default: "testing123")
+
+Apart from the updated authenticator signed with the new shared secret, the
+resent packet is an exact clone of the incoming packet.
+
+If you list multiple hosts then a copy will be sent to each host - however,
+all copies sent this way will be signed with the same shared secret.
+
+If you need to use a different shared secret then you can instantiate
+packetblast multiple times, which also lets you send selectively to
+different hosts.  The following example shows sending only dialup accounting
+to one host, and a filtered version of all accounting (including dialup) to
+another host, with a different shared secret.
+
+// sites-available/foo
+
+server foo {
+    accounting {
+        if ( Called-Station-Id ) {
+            blast_dialup
+        }
+
+        attr_filter.blasttidy
+        blast_all
+    }
+}
+
+// modules/blast
+
+packetblast blast_dialup {
+        host = 192.0.2.1
+        port = 1813
+        secret = "foobar"
+}
+
+packetblast blast_all {
+        host = 192.0.2.2
+        port = 1813
+        secret = "bazqux"
+}
+
+
+2. PROXYING
+
+You can still proxy accounting packets as normal when using this module. 
+freeradius will wait for a response from the target before responding to the
+NAS.  If the target doesn't respond then the NAS will retransmit; freeradius
+could ignore the retransmission, or could process it.
+
+This means that the proxy target *will* get the accounting data reliably,
+but the rlm_packetblast targets must be prepared to receive duplicates.
+
