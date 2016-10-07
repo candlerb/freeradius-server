@@ -46,6 +46,7 @@ static CONF_PARSER pwd_module_config[] = {
 	{ "fragment_size", FR_CONF_OFFSET(PW_TYPE_INTEGER, eap_pwd_t, fragment_size), "1020" },
 	{ "server_id", FR_CONF_OFFSET(PW_TYPE_STRING, eap_pwd_t, server_id), NULL },
 	{ "virtual_server", FR_CONF_OFFSET(PW_TYPE_STRING, eap_pwd_t, virtual_server), NULL },
+	{ "prep", FR_CONF_OFFSET(PW_TYPE_BYTE, eap_pwd_t, prep), EAP_PWD_PREP_NONE },
 	CONF_PARSER_TERMINATOR
 };
 
@@ -78,6 +79,11 @@ static int mod_instantiate (CONF_SECTION *cs, void **instance)
 
 	if ((inst->bnctx = BN_CTX_new()) == NULL) {
 		cf_log_err_cs(cs, "Failed to get BN context");
+		return -1;
+	}
+
+	if (inst->prep != EAP_PWD_PREP_NONE && inst->prep != EAP_PWD_PREP_MS) {
+		cf_log_err_cs(cs, "Invalid prep type");
 		return -1;
 	}
 
@@ -255,7 +261,7 @@ static int mod_session_init (void *instance, eap_handler_t *handler)
 	packet->prf = EAP_PWD_DEF_PRF;
 	session->token = fr_rand();
 	memcpy(packet->token, (char *)&session->token, 4);
-	packet->prep = EAP_PWD_PREP_NONE;
+	packet->prep = inst->prep;
 	memcpy(packet->identity, inst->server_id, session->out_len - sizeof(pwd_id_packet_t) );
 
 	handler->stage = PROCESS;
@@ -278,6 +284,9 @@ static int mod_process(void *arg, eap_handler_t *handler)
 	uint16_t offset;
 	uint8_t exch, *in, *ptr, msk[MSK_EMSK_LEN], emsk[MSK_EMSK_LEN];
 	uint8_t peer_confirm[SHA256_DIGEST_LENGTH];
+	const char *password;
+	int password_len;
+	uint8_t password_hash[MD4_DIGEST_LENGTH];
 	BIGNUM *x = NULL, *y = NULL;
 
 	if (((eap_ds = handler->eap_ds) == NULL) || !inst) return 0;
@@ -393,7 +402,7 @@ static int mod_process(void *arg, eap_handler_t *handler)
 
 		if ((packet->prf != EAP_PWD_DEF_PRF) ||
 		    (packet->random_function != EAP_PWD_DEF_RAND_FUN) ||
-		    (packet->prep != EAP_PWD_PREP_NONE) ||
+		    (packet->prep != inst->prep) ||
 		    (CRYPTO_memcmp(packet->token, &session->token, 4)) ||
 		    (packet->group_num != ntohs(session->group_num))) {
 			RDEBUG2("pwd id response is invalid");
@@ -470,7 +479,31 @@ static int mod_process(void *arg, eap_handler_t *handler)
 		RDEBUG("Got tunneled reply code %d", fake->reply->code);
 		rdebug_pair_list(L_DBG_LVL_1, request, fake->reply->vps, NULL);
 
-		if ((pw = fr_pair_find_by_num(fake->config, PW_CLEARTEXT_PASSWORD, 0, TAG_ANY)) == NULL) {
+		password = NULL;
+		pw = fr_pair_find_by_num(fake->config, PW_CLEARTEXT_PASSWORD, 0, TAG_ANY);
+		if (inst->prep == EAP_PWD_PREP_NONE) {
+			if (pw) {
+				password = pw->data.strvalue;
+				password_len = strlen(pw->data.strvalue);
+			}
+		}
+		if (inst->prep == EAP_PWD_PREP_MS) {
+			if (pw) {
+				/* FIXME: use mschap_ntpwdhash */
+			}
+			else {
+				pw = fr_pair_find_by_num(fake->config, PW_NT_PASSWORD, 0, TAG_ANY);
+				if (pw) {
+					if (pw->length != MD4_DIGEST_LENGTH)
+						DEBUG2("incorrect length (%zd) for NT-Password", pw->length);
+					/* PasswordHashHash */
+					fr_md4_calc(password_hash, pw->data.octets, pw->length);
+					password = (const char *)password_hash;
+					password_len = MD4_DIGEST_LENGTH;
+				}
+			}
+		}
+		if (!password) {
 			DEBUG2("failed to find password for %s to do pwd authentication",
 			session->peer_id);
 			talloc_free(fake);
@@ -478,7 +511,7 @@ static int mod_process(void *arg, eap_handler_t *handler)
 		}
 
 		if (compute_password_element(session, session->group_num,
-			     		     pw->data.strvalue, strlen(pw->data.strvalue),
+					     password, password_len,
 					     inst->server_id, strlen(inst->server_id),
 					     session->peer_id, strlen(session->peer_id),
 					     &session->token)) {
